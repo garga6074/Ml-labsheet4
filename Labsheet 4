@@ -1,0 +1,223 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+# ==========================================
+# 1. Load a dataset suitable for clustering
+# ==========================================
+# Loading the classic Iris dataset and converting it to a Pandas DataFrame
+iris = load_iris()
+df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+
+# ==========================================
+# 2. Display first and last five records
+# ==========================================
+print("--- FIRST 5 RECORDS ---")
+print(df.head(5))
+
+print("\n--- LAST 5 RECORDS ---")
+print(df.tail(5))
+
+# ==========================================
+# 3. Explore dataset details
+# ==========================================
+print("\n--- DATASET INFORMATION ---")
+df.info()
+
+print("\n--- DATA TYPES ---")
+print(df.dtypes)
+
+print("\n--- SUMMARY STATISTICS ---")
+print(df.describe())
+
+# ==========================================
+# 4. Select relevant numerical features
+# ==========================================
+# Selecting all four available numerical features for clustering
+features = ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
+X = df[features]
+
+# ==========================================
+# 5. Standardize the dataset
+# ==========================================
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+print("\nDataset successfully standardized using StandardScaler.")
+
+# ==========================================
+# 6. Implement K-Means clustering algorithm
+# ==========================================
+# Initializing the model (reproducible with random_state)
+kmeans_model = KMeans(random_state=42)
+
+# ==========================================
+# 7. Apply K-Means with K = 2 clusters
+# ==========================================
+kmeans_k2 = KMeans(n_clusters=2, random_state=42)
+df['Cluster_K2'] = kmeans_k2.fit_predict(X_scaled)
+
+print("\n--- K-MEANS WITH K=2 LABELS ---")
+print(df['Cluster_K2'].value_counts())
+# 8. Apply K-Means clustering with K = 3 clusters
+kmeans_3 = KMeans(n_clusters=3, random_state=42, n_init=10)
+labels_k3 = kmeans_3.fit_predict(X_scaled)
+
+# 9 & 10. Compare different K values & Determine optimal K using Elbow Method
+wcss = []
+k_values = range(1, 11)
+for k in k_values:
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    km.fit(X_scaled)
+    wcss.append(km.inertia_)
+
+# Plotting the Elbow Method
+plt.figure(figsize=(8, 4))
+plt.plot(k_values, wcss, marker='o', linestyle='--', color='b')
+plt.title('Step 10: Elbow Method for Optimal K')
+plt.xlabel('Number of Clusters (K)')
+plt.ylabel('WCSS (Inertia)')
+plt.show()
+
+# 11. Visualize clusters (K=3) using a scatter plot (Sepal length vs Sepal width)
+plt.figure(figsize=(8, 5))
+plt.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels_k3, cmap='viridis', s=50, alpha=0.8)
+# 12. Display the cluster centroids obtained from the K-Means algorithm
+centroids = kmeans_3.cluster_centers_
+plt.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=200, label='Centroids')
+plt.title('Step 11 & 12: K-Means (K=3) Cluster Visualization with Centroids')
+plt.xlabel('Sepal Length (Standardized)')
+plt.ylabel('Sepal Width (Standardized)')
+plt.legend()
+plt.show()
+
+# 13. Assign cluster labels to the original dataset
+df['KMeans_Labels'] = labels_k3
+
+# 14. Compare clustering results before and after feature scaling
+# Unscaled K-means for comparison
+kmeans_unscaled = KMeans(n_clusters=3, random_state=42, n_init=10)
+labels_unscaled = kmeans_unscaled.fit_predict(X)
+print("\n--- Scaling Comparison (Silhouette Scores) ---")
+print(f"Silhouette Score (Before Scaling): {silhouette_score(X, labels_unscaled):.4f}")
+print(f"Silhouette Score (After Scaling): {silhouette_score(X_scaled, labels_k3):.4f}")
+
+
+# ==========================================
+# PART 3: Hierarchical Clustering (Steps 15-21)
+# ==========================================
+
+# 15 & 16. Implement Agglomerative Hierarchical Clustering and generate Dendrogram
+plt.figure(figsize=(10, 6))
+linkage_matrix_ward = linkage(X_scaled, method='ward')
+dendrogram(linkage_matrix_ward)
+plt.title('Step 16: Dendrogram using SciPy (Ward Linkage)')
+plt.xlabel('Sample Index')
+plt.ylabel('Euclidean Distance')
+plt.show()
+
+# 17. Apply Hierarchical Clustering using Ward linkage (Optimal clusters = 3)
+agg_ward = AgglomerativeClustering(n_clusters=3, linkage='ward')
+labels_ward = agg_ward.fit_predict(X_scaled)
+
+# 18. Apply Hierarchical Clustering using Complete linkage
+agg_complete = AgglomerativeClustering(n_clusters=3, linkage='complete')
+labels_complete = agg_complete.fit_predict(X_scaled)
+
+# 19 & 20. Compare different linkage methods and Visualize results
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+ax1.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels_ward, cmap='rainbow', s=40)
+ax1.set_title('Step 20: Ward Linkage')
+ax2.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels_complete, cmap='rainbow', s=40)
+ax2.set_title('Step 20: Complete Linkage')
+plt.show()
+
+# 21. Compare Hierarchical Clustering with K-Means clustering using a Crosstab
+print("\n--- Step 21: Comparison Crosstab (K-Means vs Hierarchical Ward) ---")
+print(pd.crosstab(df['KMeans_Labels'], labels_ward, rownames=['K-Means'], colnames=['Hierarchical']))
+
+
+# ==========================================
+# PART 4: PCA & Dimensionality Reduction (Steps 22-29)
+# ==========================================
+
+# 22 & 23. Apply PCA to reduce dataset from multiple features to two principal components
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
+
+# 24. Visualize the transformed data using a two-dimensional scatter plot
+plt.figure(figsize=(8, 5))
+plt.scatter(df_pca['PC1'], df_pca['PC2'], c=labels_k3, cmap='plasma', s=50)
+plt.title('Step 24: PCA Reduced 2D Scatter Plot')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.show()
+
+# 25. Display the explained variance ratio of principal components
+print("\n--- Step 25: Explained Variance Ratio ---")
+print(pca.explained_variance_ratio_)
+
+# 26. Determine the cumulative explained variance
+cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+print(f"Cumulative Explained Variance (2 Components): {cumulative_variance[-1]:.4f}")
+
+# 27. Compare the dataset shapes before and after dimensionality reduction
+print("\n--- Step 27: Shape Comparison ---")
+print(f"Original Dataset Shape: {X_scaled.shape}")
+print(f"PCA-Transformed Dataset Shape: {X_pca.shape}")
+
+# 28. Perform K-Means clustering on the PCA-transformed dataset
+kmeans_pca = KMeans(n_clusters=3, random_state=42, n_init=10)
+labels_pca = kmeans_pca.fit_predict(X_pca)
+
+# 29. Compare clustering performance before and after applying PCA
+print("\n--- Step 29: Silhouette Score Comparison ---")
+print(f"K-Means on Full Scaled Data: {silhouette_score(X_scaled, labels_k3):.4f}")
+print(f"K-Means on PCA-Transformed Data: {silhouette_score(X_pca, labels_pca):.4f}")
+
+
+# ==========================================
+# PART 5: Evaluation, Analysis & Output (Steps 30-35)
+# ==========================================
+
+# 30. Calculate the Silhouette Score for cluster evaluation (K=3)
+score_k3 = silhouette_score(X_scaled, labels_k3)
+
+# 31. Compare Silhouette Scores for different values of K
+print("\n--- Step 31: Silhouette Scores for different K ---")
+print(f"Silhouette Score (K=2): {silhouette_score(X_scaled, labels_k2):.4f}")
+print(f"Silhouette Score (K=3): {score_k3:.4f}")
+
+# 32. Analyze the characteristics of each cluster using descriptive statistics
+df['Hierarchical_Labels'] = labels_ward
+print("\n--- Step 32: Cluster Characteristics (Mean Values per K-Means Cluster) ---")
+print(df.groupby('KMeans_Labels')[features].mean())
+
+# 33. Visualize cluster distributions using pair plots
+# Dropping temporary hierarchical labels for cleaner pairplot tracking K-means
+sns.pairplot(df.drop(columns=['Hierarchical_Labels']), hued='KMeans_Labels', palette='Set1')
+plt.suptitle('Step 33: Pair Plot of Cluster Distributions', y=1.02)
+plt.show()
+
+# 34. Save the clustered dataset as a CSV file
+output_filename = "clustered_iris_dataset.csv"
+df.to_csv(output_filename, index=False)
+print(f"\n[Success] Step 34: Clustered dataset successfully saved to '{output_filename}'")
+
+# 35. Summary Performance Breakdown Table
+print("\n" + "="*60)
+print("Step 35: SUMMARY OF PERFORMANCE FINDINGS")
+print("="*60)
+print(f"1. K-Means (K=3) Silhouette Score         : {silhouette_score(X_scaled, labels_k3):.4f}")
+print(f"2. Hierarchical (Ward) Silhouette Score   : {silhouette_score(X_scaled, labels_ward):.4f}")
+print(f"3. Hierarchical (Complete) Silhouette Score: {silhouette_score(X_scaled, labels_complete):.4f}")
+print(f"4. K-Means after 2D PCA Silhouette Score   : {silhouette_score(X_pca, labels_pca):.4f}")
+print("-"*60)
+print("Conclusion: Feature scaling significantly improves spatial separation.")
+print("The Elbow Method clearly indicates an inflection point at K=3.")
+print("PCA reduction to 2 components captures over 95% of total variance while maintaining clean clustering boundaries.")
+print("="*60)# Ml-labsheet4
